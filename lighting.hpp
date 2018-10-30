@@ -3,31 +3,18 @@
 using namespace std;
 
 // RGB modes
-#define STATIC  0
-#define RAINBOW 1
-#define FADE    2
-#define STROBE  4
+#define STATIC_MODE  0
+#define RAINBOW_MODE 1
+#define FADE_MODE    2
+#define STROBE_MODE  4
 
-typedef unsigned int uint;
-class RGB {
-public:
-	uint color[3];
-	RGB(uint color[3]) {
-		this->color[0] = color[0]; this->color[1] = color[1]; this->color[2] = color[2];
-	};
-	uint operator[](int i) {
-		return color[i];
-	}
-};
-typedef vector<RGB> RGBStrip;
-typedef vector<RGBStrip> RGBStripSeq;
-
+typedef unsigned char byte;
 
 class StaticConfig {
 private:
-	int pins[3];
-	uint color[3], rainbow[3], display[3];
-	int  mode, speed, rainbowIndex, strobe, fade, fadeDir;
+	byte pins[3], color[3], rainbow[3], display[3];
+	byte mode, rainbowIndex, strobe, fade, fadeDir;
+	long speed;
 	long long lastDisplay;
 	void doRainbow() {
 		rainbow[rainbowIndex]--;
@@ -42,10 +29,11 @@ private:
 		display[0] = color[0]*(strobe); display[1] = color[1]*(strobe); display[2] = color[2]*(strobe);
 	};
 	void doFade() {
-		fade += fadeDir;
-		if(fade >= 255) fadeDir = -1;
-		else if(fade <= 0) fadeDir = 1;
-		display[0] = color[0]*(fade/255); display[1] = color[1]*(fade/255); display[2] = color[2]*(fade/255);
+		fade += fadeDir-2;
+		if(fade == 255) fadeDir = 1;
+		else if(fade == 0) fadeDir = 3;
+		float f = float(fade);
+		display[0] = color[0]*(f/255); display[1] = color[1]*(f/255); display[2] = color[2]*(f/255);
 	};
 
 public:
@@ -55,39 +43,39 @@ public:
 		rainbowIndex = 0;
 		// start strobe and fade off
 		strobe = 0;
-		fade = -1;
-		fadeDir = 1;
+		fade = 0;
+		fadeDir = 3;
 		// default speed of 5 ms
 		speed = 5;
 		// init lastDisplay to 0 so that it updates on 1st loop
 		lastDisplay = 0;
 	};
-	int* getPins() {
+	byte* getPins() {
 		return pins;
 	};
-	uint* getDisplayColor(){
+	byte* getDisplayColor(){
 		switch(mode) {
-			case STATIC:
+			case STATIC_MODE:
 				display[0] = color[0]; display[1] = color[1]; display[2] = color[2];
 				break;
-			case RAINBOW:
+			case RAINBOW_MODE:
 				doRainbow();
 				break;
-			case FADE:
+			case FADE_MODE:
 				doFade();
 				break;
-			case STROBE:
+			case STROBE_MODE:
 				doStrobe();
 				break;
 		}
 		return display;
 	};
-	bool shouldDisplay(long long now) {
-		if(now < lastDisplay + speed) return false;
+	byte shouldDisplay(long long now) {
+		if(now < lastDisplay + speed) return 0;
 		lastDisplay = now;
-		return true;
+		return 1;
 	};
-	int setPins(int pins[3]) {
+	byte setPins(int pins[3]) {
 		int i;
 		for(i = 0; i < 3; i++) {
 			if(pins[i] < 0) return 1;
@@ -95,31 +83,31 @@ public:
 		}
 		return 0;
 	};
-	int setColor(RGB color) {
+	byte setColor(RGB color) {
 		int i;
 		for(i = 0; i < 3; i++) {
 			this->color[i] = color[i];
 		}
 		return 0;
 	};
-	int setColorChannel(int channel, uint value) {
+	byte setColorChannel(int channel, uint value) {
 		if(channel < 0 || channel > 2) return 1;
 		color[channel] = value;
 		return 0;
 	};
-	int setMode(int mode) {
+	byte setMode(int mode) {
 		switch(mode) {
-			case STATIC: 
-			case RAINBOW: 
-			case FADE: 
-			case STROBE:
+			case STATIC_MODE: 
+			case RAINBOW_MODE: 
+			case FADE_MODE: 
+			case STROBE_MODE:
 				this->mode = mode;
 				return 0;
 			default:
 				return 1;
 		}
 	};
-	int setSpeed(int speed) {
+	byte setSpeed(int speed) {
 		if(speed < 0 || speed > 60*1000) return 1;
 		this->speed = speed;
 		return 0;
@@ -128,41 +116,30 @@ public:
 
 class Channel {
 private:
-	RGBStripSeq sequence;
-	int         pin, speed, sequenceIndex;
-	long long   lastDisplay;
-
+	int seqIndex;
+	long speed;
+	long long lastDisplay;
 public:
-	Channel() {
-		sequenceIndex = 0;
-		speed = 5;
+	byte pin, seqSize;
+	long ledCount;
+
+	Channel(byte pin, long speed, long ledCount, byte seqSize) {
+		this->pin = pin;
+		this->speed = speed;
+		this->ledCount = ledCount;
+		this->seqSize = seqSize;
+		seqIndex = 0;
 		lastDisplay = 0;
 	};
-	int getPin() {
-		return pin;
-	};
-	RGBStrip getDisplayStrip() {
-		if(sequenceIndex >= sequence.size()) sequenceIndex = 0;
-		return sequence.at(sequenceIndex++);
-	};
-	bool shouldDisplay(long long now) {
-		if(now < lastDisplay + speed) return false;
+	byte shouldDisplay(long long now) {
+		if(now < lastDisplay + speed) return 0;
 		lastDisplay = now;
-		return true;
+		return 1;
 	};
-	int setSequence(RGBStripSeq sequence) {
-		this->sequence.swap(sequence);
-	};
-	int setPin(int pin) {
-		if(pin < 0) return 1;
-		this->pin = pin;
-		return 0;
-	};
-	int setSpeed(int speed) {
-		if(speed < 0 || speed > 60*1000) return 1;
-		this->speed = speed;
-		return 0;
-	};
+	int getIndex() {
+		if(sequenceIndex >= sequenceSize) sequenceIndex = 0;
+		return sequenceIndex++;
+	}
 };
 
 class AddressableConfig {

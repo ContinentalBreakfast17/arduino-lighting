@@ -1,5 +1,3 @@
-#include <vector>
-
 using namespace std;
 
 // RGB modes
@@ -37,6 +35,7 @@ private:
 	};
 
 public:
+	byte on;
 	StaticConfig() {
 		// start rainbow all red, fading to green
 		rainbow[0] = 255; rainbow[1] = 0; rainbow[2] = 0;
@@ -75,27 +74,25 @@ public:
 		lastDisplay = now;
 		return 1;
 	};
-	byte setPins(int pins[3]) {
-		int i;
-		for(i = 0; i < 3; i++) {
+	byte setPins(byte pins[3]) {
+		for(byte i = 0; i < 3; i++) {
 			if(pins[i] < 0) return 1;
 			this->pins[i] = pins[i];
 		}
 		return 0;
 	};
-	byte setColor(RGB color) {
-		int i;
-		for(i = 0; i < 3; i++) {
+	byte setColor(byte color[3]) {
+		for(byte i = 0; i < 3; i++) {
 			this->color[i] = color[i];
 		}
 		return 0;
 	};
-	byte setColorChannel(int channel, uint value) {
+	byte setColorChannel(byte channel, byte value) {
 		if(channel < 0 || channel > 2) return 1;
 		color[channel] = value;
 		return 0;
 	};
-	byte setMode(int mode) {
+	byte setMode(byte mode) {
 		switch(mode) {
 			case STATIC_MODE: 
 			case RAINBOW_MODE: 
@@ -107,8 +104,8 @@ public:
 				return 1;
 		}
 	};
-	byte setSpeed(int speed) {
-		if(speed < 0 || speed > 60*1000) return 1;
+	byte setSpeed(long speed) {
+		if(speed < 0) return 1;
 		this->speed = speed;
 		return 0;
 	};
@@ -136,26 +133,33 @@ public:
 		lastDisplay = now;
 		return 1;
 	};
-	int getIndex() {
-		if(sequenceIndex >= sequenceSize) sequenceIndex = 0;
-		return sequenceIndex++;
+	byte getIndex() {
+		if(seqIndex >= seqIndex) seqIndex = 0;
+		return seqIndex++;
 	}
 };
 
 class AddressableConfig {
-private:
-	vector<Channel> channels;
-
 public:
-	AddressableConfig() {
+	Channel* channels;
+	byte     channelCount, on;
 
+	AddressableConfig() {
+		channelCount = 0;
 	};
-	vector<Channel>& getChannels() {
-		return channels;
+	byte addChannel(Channel channel) {
+		channels = (Channel*)realloc(channels, (channelCount+1)*sizeof(Channel));
+		if(channels == NULL) return 1;
+		channels[channelCount++] = channel;
 	};
-	int setChannels(vector<Channel> channels) {
-		this->channels.swap(channels);
-	};
+	Channel& getChannel(int index) {
+		return channels[index];
+	}
+	void clear() {
+		delete(channels);
+		channelCount = 0;
+		on = 0;
+	}
 };
 
 /*
@@ -177,11 +181,5 @@ public:
 	};
 	AddressableConfig& getAddressable() {
 		return addressableConfig;
-	};
-	void start() {
-		running = true;
-	};
-	bool on() {
-		return running;
 	};
 };

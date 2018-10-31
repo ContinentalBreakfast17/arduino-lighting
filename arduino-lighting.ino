@@ -1,3 +1,4 @@
+#include <SD.h>
 #include <ArduinoJson.h>
 #include <FastLED.h>
 #include "lighting.hpp"
@@ -11,8 +12,33 @@ void displayStatic(StaticConfig& config);
 void displayAddressable(AddressableConfig& config);
 void respond(byte code);
 
+// static error codes
+#define ERR_S_JSON_READ_FAILURE  1
+#define ERR_S_NO_MODE            2
+#define ERR_S_NO_SPEED           3
+#define ERR_S_NO_COLOR           4
+#define ERR_S_NO_PINS            5
+#define ERR_S_BAD_MODE           6
+#define ERR_S_BAD_SPEED          7
+#define ERR_S_BAD_PIN_LENGTH     8
+#define ERR_S_BAD_PINS           9
+#define ERR_S_BAD_COLOR_LENGTH   10
+#define ERR_S_BAD_COLOR          11
+// addressable error codes
+#define ERR_A_JSON_READ_FAILURE  12
+#define ERR_A_MISSING_PIN        13
+#define ERR_A_MISSING_SPEED      14
+#define ERR_A_MISSING_LED_COUNT  15
+#define ERR_A_MISSING_SEQ_SIZE   16
+#define ERR_A_FILE_OPEN_FAILURE  17
+#define ERR_A_SERIAL_TIMEOUT     18
+#define ERR_A_FILE_WRITE_FAILURE 19
+
 #define SERIAL_READ_TRIES 5
 #define SERIAL_RETRY_WAIT 5
+
+// test message:
+// 1{"mode":0,"speed":5,"pins":[9,10,11],"color":[100,0,200]}
 
 
 // Global controller which holds the current data
@@ -23,9 +49,8 @@ void setup () {
 }
 
 void loop() {
-	byte parseResult = parseCommand();
-	if(parseResult == 0 && !controller.on()) controller.start();
-	respond(parseResult);
+	int parseResult = parseCommand();
+	if(parseResult >= 0) respond(parseResult);
 
 	displayStatic(controller.getStatic());
 	displayAddressable(controller.getAddressable());
@@ -35,7 +60,7 @@ int parseCommand() {
 	if(!Serial.available()) return -1;
 
 	byte result = 0;
-	byte code = Serial.read();
+	char code = Serial.read();
 	if(code) {
 		if(result = parseStaticConfig(controller.getStatic())) return result;
 	} else {
@@ -46,59 +71,61 @@ int parseCommand() {
 	return 0;
 }
 
-byte parseStaticConfig(StaticConfig& config, JsonObject& sttc) {
+byte parseStaticConfig(StaticConfig& config) {
 	DynamicJsonBuffer jsonBuffer(128);
 	JsonObject& sttc = jsonBuffer.parseObject(Serial);
 	if(!sttc.success()) return ERR_S_JSON_READ_FAILURE;
 
-	byte result = 0;
-	if(sttc.containsKey("mode") && (result = config.setMode(sttc["mode"]))) return ERR_S_BAD_MODE;
-	if(sttc.containsKey("speed") && (result = config.setSpeed(sttc["speed"]))) return ERR_S_BAD_SPEED;
-	if(sttc.containsKey("pins")) {
-		byte pins[3];
-		if(sttc.get<JsonArray&>("pins").copyTo(pins) != 3) return ERR_S_BAD_PIN_LENGTH;
-		if(result = config.setPins(pins)) return ERR_S_BAD_PINS;
-		for(byte i = 0; i < 3; i++) pinMode(pins[i], OUTPUT);
-	}
-	if(sttc.containsKey("color")) {
-		byte color[3];
-		if(sttc.get<JsonArray&>("color").copyTo(color) != 3) return ERR_S_BAD_COLOR_LENGTH;
-		if(result = config.setColor(color)) return ERR_S_BAD_COLOR;
-	}
+	if(!sttc.containsKey("mode")) return ERR_S_NO_MODE;
+	if(!sttc.containsKey("speed")) return ERR_S_NO_SPEED;
+	if(!sttc.containsKey("pins")) return ERR_S_NO_PINS;
+	if(!sttc.containsKey("color")) return ERR_S_NO_COLOR;
+
+	if(config.setMode(sttc["mode"])) return ERR_S_BAD_MODE;
+	if(config.setSpeed(sttc["speed"])) return ERR_S_BAD_SPEED;
+
+	byte pins[3];
+	if(sttc.get<JsonArray&>("pins").copyTo(pins) != 3) return ERR_S_BAD_PIN_LENGTH;
+	if(config.setPins(pins)) return ERR_S_BAD_PINS;
+	for(byte i = 0; i < 3; i++) pinMode(pins[i], OUTPUT);
+
+	byte color[3];
+	if(sttc.get<JsonArray&>("color").copyTo(color) != 3) return ERR_S_BAD_COLOR_LENGTH;
+	if(config.setColor(color)) return ERR_S_BAD_COLOR;
+
+	config.on = 1;
 	return 0;
 }
 
 byte parseAddressableConfig(AddressableConfig& config) {
 	DynamicJsonBuffer jsonBuffer(512);
 	JsonArray& chans = jsonBuffer.parseArray(Serial);
-	if(!chans.success()) return ERR_S_JSON_READ_FAILURE;
+	if(!chans.success()) return ERR_A_JSON_READ_FAILURE;
+	config.clear();
 
-	vector<Channel> channels;
 	for(JsonObject& chan : chans) {
 		if(!chan.containsKey("pin")) return ERR_A_MISSING_PIN;
 		if(!chan.containsKey("speed")) return ERR_A_MISSING_SPEED;
 		if(!chan.containsKey("ledCount")) return ERR_A_MISSING_LED_COUNT;
 		if(!chan.containsKey("seqSize")) return ERR_A_MISSING_SEQ_SIZE;
 		Channel channel(chan["pin"], chan["speed"], chan["ledCount"], chan["seqSize"]);
-		channels.push_back(channel);
+		config.addChannel(channel);
 	}
-	config.setChannels(channels);
 	return 0;
 }
 
 byte saveAddressableConfig(AddressableConfig& config) {
-	vector<Channel>& channels = config.getChannels();
-	for(int channelIndex = 0; channelIndex < channels.size(); channelIndex++) {
-		Channel& channel = channels.at(channelIndex);
+	for(int channelIndex = 0; channelIndex < config.channelCount; channelIndex++) {
+		Channel& channel = config.getChannel(channelIndex);
 
-		for(int cycleIndex = 0; cycleIndex < channel.seqSize; i++) {
-			byte filename[128];
+		for(int cycleIndex = 0; cycleIndex < channel.seqSize; cycleIndex++) {
+			char filename[128];
 			sprintf(filename, "channel%d.cycle%d.json", channelIndex, cycleIndex);
 			SD.remove(filename);
 			File file = SD.open(filename, FILE_WRITE);
 			if(!file) return ERR_A_FILE_OPEN_FAILURE;
 
-			byte serialReadTries = 0, c = 0;
+			char serialReadTries = 0, c = 0;
 			while(c != '\r') {
 				if(!Serial.available()) {
 					if(serialReadTries > SERIAL_READ_TRIES) return ERR_A_SERIAL_TIMEOUT;
@@ -112,10 +139,12 @@ byte saveAddressableConfig(AddressableConfig& config) {
 			file.close();
 		}
 	}
+	config.on = 1;
+	return 0;
 }
 
 void displayStatic(StaticConfig& config) {
-	if(!controller.on()) return;
+	if(!config.on) return;
 	long long now = millis();
 	if(config.shouldDisplay(now)) {
 		byte* color = config.getDisplayColor();
@@ -125,31 +154,30 @@ void displayStatic(StaticConfig& config) {
 }
 
 void displayAddressable(AddressableConfig& config) {
-	if(!controller.on()) return;
+	if(!config.on) return;
 
-	vector<Channel>& channels = config.getChannels();
-	for(byte channelIndex = 0; channelIndex < channels.size(); channelIndex++) {
-		Channel& channel = channels.at(channelIndex);
+	for(byte channelIndex = 0; channelIndex < config.channelCount; channelIndex++) {
+		Channel& channel = config.getChannel(channelIndex);
 		long long now = millis();
 
 		if(channel.shouldDisplay(now)) {
-			byte pin = channel.getPin();
 			int cycleIndex = channel.getIndex();
 
-			byte filename[128];
+			char filename[128];
 			sprintf(filename, "channel%d.cycle%d.json", channelIndex, cycleIndex);
 			File file = SD.open(filename, FILE_READ);
 			if(!file) continue; // Do something else?
 
-			DynamicJsonBuffer jsonBuffer(1300);
+			DynamicJsonBuffer jsonBuffer(1024);
 			JsonArray& strip = jsonBuffer.parseArray(file);
 			if(!strip.success()) continue; // Do something else?
 
 			for(int ledIndex = 0; ledIndex < strip.size(); ledIndex++) {
 				for(JsonArray& color : strip.get<JsonArray&>(ledIndex)) {
-					Serial.print(color[0]); Serial.print(color[1]); Serial.print(color[2]); Serial.print('\n');
+					Serial.print(int(color[0])); Serial.print(int(color[1])); Serial.print(int(color[2])); Serial.print('\n');
 				}
 			}
+			file.close();
 		}
 	}
 }

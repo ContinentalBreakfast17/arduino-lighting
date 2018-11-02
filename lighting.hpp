@@ -1,3 +1,5 @@
+#include <FastLED.h>
+
 using namespace std;
 
 // RGB modes
@@ -119,12 +121,14 @@ private:
 public:
 	byte pin, seqSize;
 	long ledCount;
+	CRGB* leds;
 
 	Channel(byte pin, long speed, long ledCount, byte seqSize) {
 		this->pin = pin;
 		this->speed = speed;
 		this->ledCount = ledCount;
 		this->seqSize = seqSize;
+		leds = (CRGB*)malloc(sizeof(CRGB)*ledCount);
 		seqIndex = 0;
 		lastDisplay = 0;
 	};
@@ -134,9 +138,12 @@ public:
 		return 1;
 	};
 	byte getIndex() {
-		if(seqIndex >= seqIndex) seqIndex = 0;
+		if(seqIndex >= seqSize) seqIndex = 0;
 		return seqIndex++;
-	}
+	};
+	void clear() {
+		delete(leds);
+	};
 };
 
 class AddressableConfig {
@@ -154,12 +161,15 @@ public:
 	};
 	Channel& getChannel(int index) {
 		return channels[index];
-	}
+	};
 	void clear() {
+		for(int i = 0; i < channelCount; i++) {
+			channels[i].clear();
+		}
 		delete(channels);
 		channelCount = 0;
 		on = 0;
-	}
+	};
 };
 
 /*

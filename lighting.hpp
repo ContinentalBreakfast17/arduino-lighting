@@ -120,10 +120,10 @@ private:
 	long long lastDisplay;
 public:
 	byte pin, seqSize;
-	long ledCount;
-	long next;
+	unsigned long ledCount;
+	unsigned long next;
 
-	Channel(byte pin, long speed, long ledCount, byte seqSize) {
+	Channel(byte pin, unsigned long speed, long ledCount, byte seqSize) {
 		this->pin = pin;
 		this->ledCount = ledCount;
 		this->speed = speed;

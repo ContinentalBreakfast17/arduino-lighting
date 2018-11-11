@@ -47,11 +47,11 @@ func TestSendStatic(t *testing.T) {
 	if err := json.Unmarshal([]byte(raw1), &channel1); err != nil {
 		panic(err)
 	}
-	var channel2 model.Channel
+	/*var channel2 model.Channel
 	if err := json.Unmarshal([]byte(raw2), &channel2); err != nil {
 		panic(err)
-	}
-	addr := model.AddrConfig{[]model.Channel{channel1, channel2}}
+	}*/
+	addr := model.AddrConfig{[]model.Channel{channel1}}
 
 	serial, err := NewSerial("/dev/ttyACM0", 115200)
 	if err != nil {

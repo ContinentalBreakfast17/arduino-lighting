@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<link rel="stylesheet" type="text/css" href="stylesheets/fontawesome/css/all.css">
+	<link rel="stylesheet" type="text/css" href="stylesheets/vue-tabs.css">
+	<link rel="stylesheet" type="text/css" href="stylesheets/static.css">
+</head>
+
+<body>
+	<div id="tabs">
+		<vue-tabs>
+			<v-tab v-for="(profile, index) in profiles" :key="profile">
+				<div slot="title">{{profile}}<span @click.stop="removeTab(index)" class="fas fa-trash tab-close"></span></div>
+			</v-tab>
+		</vue-tabs>
+	</div>
+
+	<div id="static">
+		<select v-model="profile.mode">
+			<option value="0">Static</option>
+			<option value="1">Rainbow</option>
+			<option value="2">Fade</option>
+			<option value="4">Strobe</option>
+		</select>
+
+		<span v-if='profile.mode != "0"'> Wait: <input type="number" v-model="profile.speed" min="5" max="2000"></input> </span>
+
+		<br><br><br><br>
+		<input id="hexColor" type="color" id="html5colorpicker" v-on:change="hex" v-model="hexVal" style="width: 100%"><br><br>
+		<rgb-input channel="R" v-bind:val="profile.color[0]" v-on:color-change="setChannel(0, $event)" v-bind:gradient="gradients.R"></rgb-input><br><br>
+		<rgb-input channel="G" v-bind:val="profile.color[1]" v-on:color-change="setChannel(1, $event)" v-bind:gradient="gradients.G"></rgb-input><br><br>
+		<rgb-input channel="B" v-bind:val="profile.color[2]" v-on:color-change="setChannel(2, $event)" v-bind:gradient="gradients.B"></rgb-input><br><br>
+	</div>
+
+</body>
+
+</html>
+
+<script src='./vendor/vue.min.js'></script>
+<script src='./vendor/tabs.min.js'></script>
+
+<script src='./components/static.js'></script>
+<script src='./components/tabs.js'></script>
+
+<style>
+.tab-close: {
+	float: right;
+}
+
+.tab-close:hover {
+	color: #d00000;
+}
+</style>

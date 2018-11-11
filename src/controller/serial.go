@@ -39,6 +39,7 @@ func NewSerial(port string, baud int) (*Serial, error) {
 }
 
 func (srl *Serial) init() error {
+	// wait and reset the port? Then send command
 	resp, err := srl.read()
 	if err != nil {
 		return err
@@ -75,7 +76,6 @@ func (srl *Serial) write(object Sendable) error {
 	if err != nil {
 		return fmt.Errorf("Failed to marshal object: %v", err)
 	}
-	fmt.Printf("%s\n", message)
 
 	for start := 0; start < len(message); start += 32 {
 		end := start + 32

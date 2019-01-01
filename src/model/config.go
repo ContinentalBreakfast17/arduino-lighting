@@ -1,6 +1,6 @@
 package model
 
 type Config struct {
-	Sttc SttcConfig `json:"static"`
-	Addr AddrConfig `json:"addressable"`
+	Sttc SttcConfig `json:"sttc"`
+	Addr AddrConfig `json:"addr"`
 }

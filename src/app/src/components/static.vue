@@ -12,7 +12,8 @@
 			<option value="4">Strobe</option>
 		</select>
 
-		<span v-if='profile.mode != "0"'> Wait: <input type="number" v-model="profile.wait" min="5" max="2000"></span>
+		<!--add tooltip to Transition delay -->
+		<span v-if='profile.mode != "0"'> Transition delay: <input type="number" v-model="profile.wait" min="5" max="2000" step="1"> ms</span>
 
 	</div>
 </template>
@@ -40,37 +41,39 @@
 			RgbInput
 		},
 
-		created: function(){
-			this.fix(false);
+		mounted: function(){
+			this.fix();
 		},
 
 		methods: {
+			fix: function() {
+				this.fixChannels();
+				this.fixGradients();
+				this.fixHex();
+			},
+			fixChannels: function() {
+				this.$refs.r.setValue(this.profile.color[0]);
+				this.$refs.g.setValue(this.profile.color[1]);
+				this.$refs.b.setValue(this.profile.color[2]);
+			},
 			fixGradients: function() {
 				var color = this.profile.color;
 				this.gradients.R = [rgbToHex([0, color[1], color[2]]), rgbToHex([255, color[1], color[2]])];
 				this.gradients.G = [rgbToHex([color[0], 0, color[2]]), rgbToHex([color[0], 255, color[2]])];
 				this.gradients.B = [rgbToHex([color[0], color[1], 0]), rgbToHex([color[0], color[1], 255])];
 			},
+			fixHex: function() {
+				this.hexVal = rgbToHex(this.profile.color);
+			},
 			hex: function() {
 				this.hexVal = this.$refs.hex.value;
 				var color = parseColor(this.hexVal);
 				this.profile.color = color.slice();
-				this.fix(true);
+				this.fix();
 			},
 			setChannel: function(channel, val) {
 				this.profile.color[channel] = parseInt(val, 10);
-				this.fix(false)
-			},
-			fix: function(hexChange) {
-				this.fixGradients();
-
-				if(hexChange) {
-					this.$refs.r.setValue(this.profile.color[0]);
-					this.$refs.g.setValue(this.profile.color[1]);
-					this.$refs.b.setValue(this.profile.color[2]);
-				} else {
-					this.hexVal = rgbToHex(this.profile.color);
-				}
+				this.fix();
 			}
 		}
 	}

@@ -1,8 +1,8 @@
 <template>
 	<span class="rgbContainer">
 		<span class="channelLabel">{{ channel }}:</span>
-		<input type="number" v-model="cpy" @change="$emit('change', cpy)" min="0" max="255" class="channelTextbox">
-		<input type="range" v-model="cpy" @change="$emit('change', cpy)" min="0" max="255" class="slider" :style="{ 'background-image' : 'linear-gradient(to right, ' + gradient[0] + ', ' + gradient[1] +')' }"> 
+		<input type="number" v-model="cpy" @change="$emit('change', cpy)" min="0" max="255" step="1" class="channelTextbox">
+		<input type="range" v-model="cpy" @change="$emit('change', cpy)" min="0" max="255" step="1" class="slider" :style="{ 'background-image' : 'linear-gradient(to right, ' + gradient[0] + ', ' + gradient[1] +')' }"> 
 	</span>
 </template>
 
